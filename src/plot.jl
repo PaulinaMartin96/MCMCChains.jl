@@ -191,7 +191,7 @@ end
 @recipe function f(
     yobs_data,
     ypred_data::Chains;
-    yvar_name::AbstractVector{<:Symbol},
+    yvar_name::AbstractVector{Symbol} = [],
     plot_type = :density,
     predictive_check = :posterior,
     n_samples::Int = 50
@@ -204,83 +204,151 @@ end
         index = sample(1:size(ypred_data)[1], N, replace = false, ordered = true)
 
         if ndims(yobs_data) == 1
-            if predictive_check == :posterior
-                title --> "Posterior predictive check"
-            elseif predictive_check == :prior
-                title --> "Prior predictive check"
-            else
-                throw(ArgumentError("`predictive_check` must be one of `prior` or `posterior`"))
-            end
-            y_obs = plot_type == :density ? vec(yobs_data) : ecdf(vec(yobs_data))
-            #y_obs = vec(yobs_data)
+            y_obs = plot_type == :cumulative ? ecdf(vec(yobs_data)) : vec(yobs_data)
             predictions = ypred_data.value.data[index,:,:]
-            #ymean_pred = vec(mean(ypred_data.value.data, dims = 1))
-            ymean_pred = plot_type == :density ? vec(mean(ypred_data.value.data, dims = 1)) : ecdf(vec(mean(ypred_data.value.data, dims = 1)))
-            for i in 1:N
-                y_pred = plot_type == :density ? predictions[i,:,:] : ecdf(vec(predictions[i,:,:]))
-                #series = plot_type == :density ? :density : :ecdfplot
+            ymean_pred = (plot_type == :cumulative ? ecdf(vec(mean(ypred_data.value.data, dims = 1)))
+                            : vec(mean(ypred_data.value.data, dims = 1)))
+
+            if plot_type == :density || plot_type == :cumulative
+                if predictive_check == :posterior
+                    title --> "Posterior predictive check"
+                elseif predictive_check == :prior
+                    title --> "Prior predictive check"
+                else
+                    throw(ArgumentError("`predictive_check` must be one of `prior` or `posterior`"))
+                end
+                for i in 1:N
+                    y_pred = (plot_type == :cumulative ? ecdf(vec(predictions[i,:,:]))
+                            : vec(predictions[i,:,:]))
+                    ypred_label = (isempty(yvar_name) ? (i == 1 ? "y pred" : nothing)
+                                    : (i == 1 ? "$(yvar_name[1]) pred" : nothing))
+                    @series begin
+                        seriestype := :density
+                        seriesalpha --> 0.3
+                        linecolor --> "#BBBBBB"
+                        label --> ypred_label
+                        y_pred
+                    end
+                end
                 @series begin
                     seriestype := :density
-                    seriesalpha --> 0.3
-                    linecolor --> "#BBBBBB"
-                    label --> nothing
-                    y_pred
+                    label --> (isempty(yvar_name) ? "y obs" : "$(yvar_name[1]) obs")
+                    y_obs
                 end
-            end
-            @series begin
-                seriestype := :density
-                label --> "Y obs"
-                y_obs
-            end
-            @series begin
-                seriestype := :density
-                label --> "Y mean"
-                ymean_pred
+                @series begin
+                    seriestype := :density
+                    label --> (isempty(yvar_name) ? "y mean" : "$(yvar_name[1]) mean")
+                    ymean_pred
+                end
+
+            elseif plot_type == :histogram
+                layout --> N + 2
+                k = 1
+                @series begin
+                    subplot := k
+                    seriestype := :histogram
+                    label --> (isempty(yvar_name) ? "y obs" : "$(yvar_name[1]) obs")
+                    y_obs
+                end
+                k = 2
+                @series begin
+                    subplot := k
+                    seriestype := :histogram
+                    label --> (isempty(yvar_name) ? "y mean" : "$(yvar_name[1]) mean")
+                    ymean_pred
+                end
+                for i in 1:N
+                    y_pred = predictions[i,:,:]
+                    @series begin
+                        subplot := k + i
+                        seriestype := :histogram
+                        label --> nothing
+                        y_pred
+                    end
+                end
+            else
+                throw(ArgumentError("`plot_type` must be one of `:density`, `:cumulative`
+                    or `histogram`"))
             end
 
         elseif ndims(yobs_data) > 1
             n_yval = size(yobs_data)[1]
             n_yvar = size(yobs_data)[2]
             mean_arr = reshape(mean(ypred_data.value.data, dims = 1), (n_yval, n_yvar))
-
-            layout := (1, n_yvar)
             k = 0
             for j in 1:n_yvar
                 sections = MCMCChains.group(ypred_data, Symbol(yvar_name[j]))
                 predictions = sections.value.data[index,:,:]
-                y_obs = plot_type == :density ? yobs_data[:,j] : ecdf(vec(yobs_data[:,j]))
-                ymean_pred = plot_type == :density ? mean_arr[:,j] : ecdf(vec(mean_arr[:,j]))
-                if predictive_check == :posterior
-                    title --> "Posterior predictive check for $(yvar_name[j])"
-                elseif predictive_check == :prior
-                    title --> "Prior predictive check for $(yvar_name[j])"
-                else
-                    throw(ArgumentError("`predictive_check` must be one of `prior` or `posterior`"))
-                end
+                y_obs = plot_type == :cumulative ? ecdf(vec(yobs_data[:,j])) : vec(yobs_data[:,j])
+                ymean_pred = plot_type == :cumulative ? ecdf(vec(mean_arr[:,j])) : vec(mean_arr[:,j])
 
-                k += 1
-                for i in 1:N
-                    y_pred = plot_type == :density ? predictions[i,:,:] : ecdf(vec(predictions[i,:,:]))
+                if plot_type == :density || plot_type == :cumulative
+                    k += 1
+                    layout --> (1, n_yvar)
+                    if predictive_check == :posterior
+                        title --> "Posterior predictive check"
+                    elseif predictive_check == :prior
+                        title --> "Prior predictive check"
+                    else
+                        throw(ArgumentError("`predictive_check` must be `prior` or `posterior`"))
+                    end
+
+                    for i in 1:N
+                        y_pred = (plot_type == :cumulative ? ecdf(vec(predictions[i,:,:]))
+                                    : vec(predictions[i,:,:]))
+                        ypred_label = i == 1 ? "$(yvar_name[j]) pred" : nothing
+                        @series begin
+                            subplot := k
+                            seriestype := :density
+                            seriesalpha --> 0.3
+                            linecolor --> "#BBBBBB"
+                            label --> ypred_label
+                            y_pred
+                        end
+                    end
                     @series begin
                         subplot := k
                         seriestype := :density
-                        seriesalpha --> 0.3
-                        linecolor --> "#BBBBBB"
-                        label --> nothing
-                        y_pred
+                        label --> "$(yvar_name[j]) obs"
+                        y_obs
                     end
-                end
-                @series begin
+                    @series begin
+                        subplot := k
+                        seriestype := :density
+                        label --> "$(yvar_name[j]) mean"
+                        ymean_pred
+                    end
+
+                elseif plot_type == :histogram
                     subplot := k
-                    seriestype := :density
-                    label --> "$(yvar_name[j]) obs"
-                    y_obs
-                end
-                @series begin
-                    subplot := k
-                    seriestype := :density
-                    label --> "$(yvar_name[j]) mean"
-                    ymean_pred
+                    layout --> N + 2
+                    h = 1
+                    @series begin
+                        subplot := h
+                        seriestype := :histogram
+                        label --> "$(yvar_name[j]) obs"
+                        y_obs
+                    end
+                    h = 2
+                    @series begin
+                        subplot := h
+                        seriestype := :histogram
+                        label --> "$(yvar_name[j]) mean"
+                        ymean_pred
+                    end
+                    for i in 1:N
+                        y_pred = predictions[i,:,:]
+                        @series begin
+                            subplot := h + i
+                            seriestype := :histogram
+                            label --> nothing
+                            y_pred
+                        end
+                    end
+
+                else
+                    throw(ArgumentError("`plot_type` must be one of `:density`,
+                        `:cumulative` or `:histogram`"))
                 end
             end
         else
