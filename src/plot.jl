@@ -206,8 +206,9 @@ end
         if ndims(yobs_data) == 1
             y_obs = plot_type == :cumulative ? ecdf(vec(yobs_data)) : vec(yobs_data)
             predictions = ypred_data.value.data[index,:,:]
-            ymean_pred = (plot_type == :cumulative ? ecdf(vec(mean(ypred_data.value.data, dims = 1)))
-                            : vec(mean(ypred_data.value.data, dims = 1)))
+            ymean_pred = (plot_type == :cumulative
+                ? ecdf(vec(mean(ypred_data.value.data, dims = 1)))
+                : vec(mean(ypred_data.value.data, dims = 1)))
 
             if plot_type == :density || plot_type == :cumulative
                 if predictive_check == :posterior
@@ -215,13 +216,14 @@ end
                 elseif predictive_check == :prior
                     title --> "Prior predictive check"
                 else
-                    throw(ArgumentError("`predictive_check` must be one of `prior` or `posterior`"))
+                    throw(ArgumentError("`predictive_check` must be one of `prior` or
+                        `posterior`"))
                 end
                 for i in 1:N
                     y_pred = (plot_type == :cumulative ? ecdf(vec(predictions[i,:,:]))
-                            : vec(predictions[i,:,:]))
+                        : vec(predictions[i,:,:]))
                     ypred_label = (isempty(yvar_name) ? (i == 1 ? "y pred" : nothing)
-                                    : (i == 1 ? "$(yvar_name[1]) pred" : nothing))
+                        : (i == 1 ? "$(yvar_name[1]) pred" : nothing))
                     @series begin
                         seriestype := :density
                         seriesalpha --> 0.3
@@ -279,8 +281,10 @@ end
             for j in 1:n_yvar
                 sections = MCMCChains.group(ypred_data, Symbol(yvar_name[j]))
                 predictions = sections.value.data[index,:,:]
-                y_obs = plot_type == :cumulative ? ecdf(vec(yobs_data[:,j])) : vec(yobs_data[:,j])
-                ymean_pred = plot_type == :cumulative ? ecdf(vec(mean_arr[:,j])) : vec(mean_arr[:,j])
+                y_obs = (plot_type == :cumulative ? ecdf(vec(yobs_data[:,j]))
+                    : vec(yobs_data[:,j]))
+                ymean_pred = (plot_type == :cumulative ? ecdf(vec(mean_arr[:,j]))
+                    : vec(mean_arr[:,j]))
 
                 if plot_type == :density || plot_type == :cumulative
                     k += 1
@@ -290,19 +294,19 @@ end
                     elseif predictive_check == :prior
                         title --> "Prior predictive check"
                     else
-                        throw(ArgumentError("`predictive_check` must be `prior` or `posterior`"))
+                        throw(ArgumentError("`predictive_check` must be one of `prior`
+                            or `posterior`"))
                     end
 
                     for i in 1:N
                         y_pred = (plot_type == :cumulative ? ecdf(vec(predictions[i,:,:]))
-                                    : vec(predictions[i,:,:]))
-                        ypred_label = i == 1 ? "$(yvar_name[j]) pred" : nothing
+                            : vec(predictions[i,:,:]))
                         @series begin
                             subplot := k
                             seriestype := :density
                             seriesalpha --> 0.3
                             linecolor --> "#BBBBBB"
-                            label --> ypred_label
+                            label --> (i == 1 ? "$(yvar_name[j]) pred" : nothing)
                             y_pred
                         end
                     end
