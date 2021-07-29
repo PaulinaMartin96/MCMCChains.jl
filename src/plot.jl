@@ -34,7 +34,7 @@ const supportedplots = push!(collect(keys(translationdict)), :mixeddensity, :cor
     barbounds = (-Inf, Inf),
     maxlag = nothing,
     append_chains = false,
-    sections = chains.name_map[:parameters],
+    par_sections = chains.name_map[:parameters],
     combined = true
 )
     st = get(plotattributes, :seriestype, :traceplot)
@@ -69,28 +69,22 @@ const supportedplots = push!(collect(keys(translationdict)), :mixeddensity, :cor
         ac_mat = convert(Array, ac)
         val = colordim == :parameter ? ac_mat[:, :, i]' : ac_mat[i, :, :]
         _AutocorPlot(lags, val)
-    elseif st ∈ supportedplots
-        translationdict[st](c, val)
-    else
-        range(c), val
-    end
 
-    total_chains = i
-    if st == :violinplot
+    elseif st == :violinplot
         n_iter, n_par, n_chains = size(chains)
         if combined
             colordim := :chain
-            par = string.(reshape(repeat(sections, inner = n_iter), n_iter, n_par))[:,i]
+            par = string.(reshape(repeat(par_sections, inner = n_iter), n_iter, n_par))[:,i]
             val = Array(chains)[:,i]
             _ViolinPlot(par, val)
         elseif combined == false
             if colordim == :chain
-                par_names = ["$(sections[i]).Chain $j" for i in 1:n_par, j in 1:n_chains]
+                par_names = ["$(par_sections[i]).Chain $j" for i in 1:n_par, j in 1:n_chains]
                 pars = string.(reshape(repeat(vec(par_names), inner = n_iter), (n_iter, n_par, n_chains)))
                 val = chains.value[:,i,:]
                 par = pars[:,i,:]
             elseif colordim == :parameter
-                par_vec = repeat(sections, inner = n_iter)
+                par_vec = repeat(par_sections, inner = n_iter)
                 pars = string.(reshape(repeat(par_vec, n_chains, 1), (n_iter, n_par, n_chains)))
                 val = chains.value[:,:,i]
                 par = pars[:,:,i]
